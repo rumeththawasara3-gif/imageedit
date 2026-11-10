@@ -18,10 +18,7 @@ import {
   SlidersHorizontal,
   Tag,
   HelpCircle,
-  AlertCircle,
-  UserCheck,
-  Sun,
-  Palette
+  AlertCircle
 } from 'lucide-react';
 import JSZip from 'jszip';
 
@@ -89,33 +86,33 @@ interface PhotoItem {
 }
 
 const DEFAULT_ANALYSIS: ImageAnalysis = {
-  detected_subject: 'General Photograph',
+  detected_subject: 'General Portrait / Landscape',
   has_faces: false,
   current_color_cast: 'none',
-  lighting_condition: 'balanced daylight',
+  lighting_condition: 'natural daylight',
 };
 
 const DEFAULT_PIPELINE: EditingPipeline = {
   white_balance: {
-    temperature_adjustment: 10,
+    temperature_adjustment: 5,
     tint_adjustment: 0,
     auto_neutralize: true,
   },
   color_grading: {
-    vibe_preset: 'cinematic warm',
-    exposure: 10,
-    contrast: 15,
-    saturation: 10,
-    vibrancy: 15,
+    vibe_preset: 'Cinematic Natural Portrait',
+    exposure: 5,
+    contrast: 10,
+    saturation: 0,
+    vibrancy: 10,
   },
   retouch_and_enhancement: {
     face_restoration: {
-      enabled: false,
-      sharpness_boost: 20,
+      enabled: true,
+      sharpness_boost: 10,
     },
     subject_enhancement: {
-      local_contrast: 25,
-      edge_sharpening: 15,
+      local_contrast: 15,
+      edge_sharpening: 10,
     },
     background_blur: {
       enabled: false,
@@ -124,8 +121,8 @@ const DEFAULT_PIPELINE: EditingPipeline = {
   },
   branding_overlay: {
     add_footer: true,
-    tag_style: 'clean minimalist / professional badge',
-    position: 'bottom-center',
+    tag_style: 'clean minimalist signature',
+    position: 'bottom-right',
   },
 };
 
@@ -138,7 +135,7 @@ export default function App() {
   const [viewMode, setViewMode] = useState<'grid' | 'studio'>('grid');
   const [compareBefore, setCompareBefore] = useState(false);
 
-  const [globalWatermarkText, setGlobalWatermarkText] = useState('© 2026 Lumina Studio • Shot on AI');
+  const [globalWatermarkText, setGlobalWatermarkText] = useState('Rumeth Thawasara');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -174,7 +171,7 @@ export default function App() {
     }
   };
 
-  // Professional High-End Portrait Suite & HSL Channel Color Grading Engine
+  // Professional Color Grading Engine with Strict Skin Tone Protection & Olive/Emerald Foliage Shift
   const renderProcessedImage = (
     imgElement: HTMLImageElement,
     pipeline: EditingPipeline,
@@ -243,48 +240,31 @@ export default function App() {
         let g = data[i + 1];
         let b = data[i + 2];
 
-        // 1. Golden Hour White Balance (+350K shift)
-        r += 10;
-        b -= 8;
+        // 1. Natural Golden-Hour White Balance Shift (+350K)
+        r += 8;
+        b -= 6;
 
         // 2. Convert to HSL
         let [h, s, l] = rgbToHsl(r, g, b);
 
-        // 3. Selective HSL Channel Adjustments matching Blueprint
-        // Reds: hue 0, sat -5%, lum +2%
-        if (h <= 10 || h >= 350) {
-          s *= 0.95;
-          l = Math.min(1, l * 1.02);
-        }
-        // Yellows: hue -12°, sat -20%, lum +10%
-        else if (h > 10 && h <= 45) {
-          h = (h - 12 + 360) % 360;
-          s *= 0.80;
-          l = Math.min(1, l * 1.10);
-        }
-        // Greens (Foliage & background): hue -18°, sat -35%, lum -5% -> Olive/Emerald cinematic shift
-        else if (h > 45 && h <= 170) {
-          h = (h - 18 + 360) % 360;
-          s *= 0.65;
-          l *= 0.95;
-        }
-        // Blues: hue +5°, sat -10%, lum 0%
-        else if (h > 180 && h < 260) {
-          h = (h + 5) % 360;
-          s *= 0.90;
-        }
-
-        // 4. Skin Tone Protection (Isolate warm skin tones 15° - 38°)
-        const isSkinTone = h >= 15 && h <= 38 && s > 0.15 && l > 0.25 && l < 0.9;
+        // 3. Strict Human Skin Tone Protection & Isolation (Hues 10° to 45°)
+        const isSkinTone = h >= 10 && h <= 45 && s > 0.1 && s < 0.75 && l > 0.25 && l < 0.92;
         if (isSkinTone) {
-          s = Math.min(0.6, s * 1.08); // preserve soft golden skin tones
+          // Preserve soft golden natural skin tones without harsh saturation or contrast distortion
+          s = Math.min(0.52, s * 1.02);
+        } else {
+          // 4. Foliage & Background Grading: desaturate and shift greens (70° - 165°) toward deep, muted cinematic olive/emerald
+          if (h >= 70 && h <= 165) {
+            h = h * 0.35 + 140 * 0.65; // Shift toward olive/emerald
+            s *= 0.52; // Strong desaturation of neon/radioactive greens
+            l *= 0.92; // Deepen slightly for rich cinematic foliage
+          }
         }
 
-        // Convert back to RGB
         let [nr, ng, nb] = hslToRgb(h, s, l);
         r = nr; g = ng; b = nb;
 
-        // 5. Tone Curves: Matte shadow lift & highlight rolloff (zero crushed blacks)
+        // 5. Professional Tone Curves: Matte shadow lift & smooth highlight rolloff (zero crushed blacks)
         const normalize = (v: number) => v / 255;
         const denormalize = (v: number) => Math.min(255, Math.max(0, v * 255));
 
@@ -292,35 +272,35 @@ export default function App() {
         let fnG = normalize(g);
         let fnB = normalize(b);
 
-        const applyToneCurves = (x: number) => {
-          // Matte shadow lift (black floor to 0.12)
-          const lifted = x * 0.86 + 0.14;
-          // Filmic S-curve with soft highlight rolloff
+        const applySmoothCurves = (x: number) => {
+          // Soft matte shadow lift (black floor 0.1)
+          const lifted = x * 0.9 + 0.1;
+          // Smooth S-curve with zero clipping
           return lifted < 0.5 
             ? 2 * lifted * lifted 
             : 1 - Math.pow(-2 * lifted + 2, 2) / 2;
         };
 
-        fnR = applyToneCurves(fnR);
-        fnG = applyToneCurves(fnG);
-        fnB = applyToneCurves(fnB);
+        fnR = applySmoothCurves(fnR);
+        fnG = applySmoothCurves(fnG);
+        fnB = applySmoothCurves(fnB);
 
         r = denormalize(fnR);
         g = denormalize(fnG);
         b = denormalize(fnB);
 
-        // 6. Split-Toning (Cool shadows, warm highlights)
+        // 6. Subtle Split-Toning (Cool shadows, warm highlights)
         const luma = 0.299 * r + 0.587 * g + 0.114 * b;
         const shadowWeight = 1 - luma / 255;
         const highlightWeight = luma / 255;
 
-        r -= shadowWeight * 3;
+        r -= shadowWeight * 2;
         g -= shadowWeight * 1;
-        b += shadowWeight * 7;
+        b += shadowWeight * 5;
 
-        r += highlightWeight * 7;
-        g += highlightWeight * 3;
-        b -= highlightWeight * 3;
+        r += highlightWeight * 5;
+        g += highlightWeight * 2;
+        b -= highlightWeight * 2;
 
         data[i] = Math.min(255, Math.max(0, r));
         data[i + 1] = Math.min(255, Math.max(0, g));
@@ -329,41 +309,33 @@ export default function App() {
 
       ctx.putImageData(imgData, 0, 0);
 
-      // Branding Overlay Footer Tag
+      // Function to apply Rumeth Thawasara branding watermark to every photo in the batch queue
+      const applyCustomBranding = (
+        cnv: HTMLCanvasElement,
+        context: CanvasRenderingContext2D,
+        customText = "Rumeth Thawasara"
+      ) => {
+        const width = cnv.width;
+        const height = cnv.height;
+
+        const fontSize = Math.max(16, Math.floor(width * 0.022));
+        context.font = `500 ${fontSize}px sans-serif`;
+        context.fillStyle = "rgba(255, 255, 255, 0.85)";
+        context.shadowColor = "rgba(0, 0, 0, 0.6)";
+        context.shadowBlur = 6;
+        context.textAlign = "right";
+
+        const paddingX = width * 0.03;
+        const paddingY = height * 0.03;
+        
+        context.fillText(customText, width - paddingX, height - paddingY);
+        context.shadowBlur = 0;
+      };
+
       const branding = pipeline.branding_overlay;
       if (branding.add_footer && wmText) {
         ctx.save();
-        const fontSize = Math.max(14, Math.round((canvas.width / 1100) * 22));
-        ctx.font = `600 ${fontSize}px system-ui, sans-serif`;
-
-        const metrics = ctx.measureText(wmText);
-        const padding = fontSize * 1.4;
-        let x = padding;
-        let y = canvas.height - padding;
-
-        if (branding.position === 'bottom-right') {
-          x = canvas.width - metrics.width - padding;
-        } else if (branding.position === 'bottom-center') {
-          x = (canvas.width - metrics.width) / 2;
-        }
-
-        // Background professional badge
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
-        const bgPad = fontSize * 0.7;
-        ctx.beginPath();
-        ctx.roundRect(
-          x - bgPad,
-          y - fontSize - bgPad * 0.5,
-          metrics.width + bgPad * 2,
-          fontSize + bgPad * 1.3,
-          10
-        );
-        ctx.fill();
-
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-        ctx.shadowColor = 'rgba(0,0,0,0.6)';
-        ctx.shadowBlur = 4;
-        ctx.fillText(wmText, x, y);
+        applyCustomBranding(canvas, ctx, wmText);
         ctx.restore();
       }
 
@@ -513,7 +485,7 @@ export default function App() {
     if (!photo.processedUrl) return;
     const a = document.createElement('a');
     a.href = photo.processedUrl;
-    a.download = `lumina_graded_${photo.name}`;
+    a.download = `rumeth_thawasara_graded_${photo.name}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -527,20 +499,20 @@ export default function App() {
     setIsZipExporting(true);
     try {
       const zip = new JSZip();
-      const folder = zip.folder('lumina_graded_folder');
+      const folder = zip.folder('rumeth_thawasara_photos');
 
       for (const p of gradedPhotos) {
         if (!p.processedUrl) continue;
         const response = await fetch(p.processedUrl);
         const blob = await response.blob();
-        folder?.file(`graded_${p.name}`, blob);
+        folder?.file(`rumeth_thawasara_${p.name}`, blob);
       }
 
       const content = await zip.generateAsync({ type: 'blob' });
       const url = URL.createObjectURL(content);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `lumina_ai_batch_export_${Date.now()}.zip`;
+      a.download = `rumeth_thawasara_batch_export_${Date.now()}.zip`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -576,15 +548,15 @@ export default function App() {
         className="hidden"
       />
 
-      {/* Top Bar Contract */}
+      {/* Top Bar Contract - Rumeth Thawasara Branding */}
       <header className="flex items-center justify-between gap-8 px-6 py-4 border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md sticky top-0 z-50">
         <div className="flex items-center gap-3 shrink-0">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
-            <Sparkles className="w-5 h-5 text-white" />
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center shadow-lg shadow-amber-500/25">
+            <Camera className="w-5 h-5 text-white" />
           </div>
           <div>
-            <span className="text-lg font-bold tracking-tight text-white">Lumina AI</span>
-            <span className="text-xs text-indigo-400 font-medium ml-2 hidden sm:inline">Schema-Driven Studio</span>
+            <span className="text-lg font-bold tracking-tight text-white">Rumeth Thawasara</span>
+            <span className="text-xs text-amber-400 font-medium ml-2 hidden sm:inline">Photo Studio</span>
           </div>
         </div>
 
@@ -608,7 +580,7 @@ export default function App() {
             </button>
           )}
           <span className="text-slate-700">·</span>
-          <span className="text-xs text-slate-500">Structured Editing Pipeline Schema</span>
+          <span className="text-xs text-slate-500">Professional Skin Tone & Foliage Grading Suite</span>
         </nav>
 
         <div className="flex items-center gap-3 shrink-0">
@@ -621,7 +593,7 @@ export default function App() {
           </button>
           <button
             onClick={() => folderInputRef.current?.click()}
-            className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-500 transition-all flex items-center gap-2 shadow-lg shadow-indigo-600/25 whitespace-nowrap shrink-0 cursor-pointer"
+            className="px-4 py-2 text-xs font-semibold text-white bg-amber-600 rounded-lg hover:bg-amber-500 transition-all flex items-center gap-2 shadow-lg shadow-amber-600/25 whitespace-nowrap shrink-0 cursor-pointer"
           >
             <FolderUp className="w-4 h-4" />
             Upload Folder
@@ -633,14 +605,14 @@ export default function App() {
       <main className="flex-1 flex flex-col p-6 max-w-7xl mx-auto w-full">
         {photos.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center py-20 px-4 text-center">
-            <div className="w-24 h-24 rounded-3xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mb-6 shadow-2xl shadow-indigo-500/10 animate-pulse">
-              <Camera className="w-12 h-12 text-indigo-400" />
+            <div className="w-24 h-24 rounded-3xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-6 shadow-2xl shadow-amber-500/10 animate-pulse">
+              <Camera className="w-12 h-12 text-amber-400" />
             </div>
             <h1 className="text-3xl font-bold tracking-tight text-white mb-3">
-              Schema-Driven AI Photo Pipeline Studio
+              Rumeth Thawasara Professional Photo Studio
             </h1>
             <p className="text-slate-400 max-w-xl text-sm mb-8 leading-relaxed">
-              Upload a folder of photos. Gemini AI inspects the subject, faces, lighting conditions, and color cast, executing an automated editing pipeline with white balance, color grading, retouching, and branding overlays.
+              Upload a folder or set of photos. AI analyzes subjects, lighting, and skin tones, applying a professional DaVinci Resolve style grading pipeline with strict skin tone protection, olive/emerald foliage grading, matte film curves, and signature branding.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-4">
               <button
@@ -652,7 +624,7 @@ export default function App() {
               </button>
               <button
                 onClick={() => folderInputRef.current?.click()}
-                className="px-6 py-3 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-500 transition-all flex items-center gap-2.5 shadow-xl shadow-indigo-600/30 cursor-pointer"
+                className="px-6 py-3 text-sm font-semibold text-white bg-amber-600 rounded-xl hover:bg-amber-500 transition-all flex items-center gap-2.5 shadow-xl shadow-amber-600/30 cursor-pointer"
               >
                 <FolderUp className="w-5 h-5" />
                 Select Photo Folder
@@ -668,7 +640,7 @@ export default function App() {
                   <span className="text-sm font-semibold text-white">{photos.length} Photos</span>
                   <span className="text-slate-600">·</span>
                   <span className="text-xs text-slate-400">
-                    {photos.filter((p) => p.status === 'graded').length} Pipeline Graded
+                    {photos.filter((p) => p.status === 'graded').length} Graded by Rumeth Thawasara
                   </span>
                 </div>
                 <div className="h-4 w-px bg-slate-800 hidden sm:block" />
@@ -677,7 +649,7 @@ export default function App() {
                     onClick={() => setViewMode('grid')}
                     className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                       viewMode === 'grid'
-                        ? 'bg-indigo-600 text-white'
+                        ? 'bg-amber-600 text-white'
                         : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                     }`}
                   >
@@ -688,11 +660,11 @@ export default function App() {
                       onClick={() => setViewMode('studio')}
                       className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                         viewMode === 'studio'
-                          ? 'bg-indigo-600 text-white'
+                          ? 'bg-amber-600 text-white'
                           : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                       }`}
                     >
-                      Pipeline Studio
+                      Interactive Studio
                     </button>
                   )}
                 </div>
@@ -702,7 +674,7 @@ export default function App() {
                 <button
                   onClick={handleBatchProcess}
                   disabled={isBatchProcessing}
-                  className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-indigo-600/20 cursor-pointer"
+                  className="px-4 py-2 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 disabled:opacity-50 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-amber-600/20 cursor-pointer"
                 >
                   {isBatchProcessing ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
@@ -710,8 +682,8 @@ export default function App() {
                     <Sparkles className="w-4 h-4" />
                   )}
                   {isBatchProcessing
-                    ? `Running Pipeline (${batchProgress.current}/${batchProgress.total})`
-                    : 'Run AI Pipeline on All'}
+                    ? `Processing (${batchProgress.current}/${batchProgress.total})`
+                    : 'Grade All Photos'}
                 </button>
 
                 <button
@@ -751,13 +723,13 @@ export default function App() {
                           </span>
                         )}
                         {photo.status === 'analyzing' && (
-                          <span className="text-indigo-400 flex items-center gap-1 animate-pulse">
-                            <RefreshCw className="w-3 h-3 animate-spin" /> AI Analyzing
+                          <span className="text-amber-400 flex items-center gap-1 animate-pulse">
+                            <RefreshCw className="w-3 h-3 animate-spin" /> Analyzing
                           </span>
                         )}
                         {photo.status === 'graded' && (
                           <span className="text-emerald-400 flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3" /> Processed
+                            <CheckCircle2 className="w-3 h-3" /> Graded
                           </span>
                         )}
                         {photo.status === 'error' && (
@@ -780,7 +752,7 @@ export default function App() {
                           {photo.name}
                         </h4>
                         <p className="text-xs text-slate-400 mt-1">
-                          <span className="text-indigo-300 font-medium">Subject:</span>{' '}
+                          <span className="text-amber-400 font-medium">Subject:</span>{' '}
                           {photo.analysis.detected_subject || 'Analyzing...'}
                         </p>
                       </div>
@@ -790,10 +762,10 @@ export default function App() {
                           <button
                             onClick={() => analyzePhoto(photo.id)}
                             disabled={photo.status === 'analyzing'}
-                            className="px-3 py-1.5 text-xs font-semibold text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                            className="px-3 py-1.5 text-xs font-semibold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
                           >
                             <Sparkles className="w-3.5 h-3.5" />
-                            {photo.status === 'analyzing' ? 'Running...' : 'Run Pipeline'}
+                            {photo.status === 'analyzing' ? 'Grading...' : 'Grade Photo'}
                           </button>
                         ) : (
                           <button
@@ -804,7 +776,7 @@ export default function App() {
                             className="px-3 py-1.5 text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
                           >
                             <SlidersHorizontal className="w-3.5 h-3.5" />
-                            Edit Pipeline
+                            Fine-tune
                           </button>
                         )}
 
@@ -812,7 +784,7 @@ export default function App() {
                           {photo.processedUrl && (
                             <button
                               onClick={() => downloadPhoto(photo)}
-                              title="Download Processed"
+                              title="Download Graded Photo"
                               className="p-1.5 text-slate-400 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded-lg transition-colors"
                             >
                               <Download className="w-4 h-4" />
@@ -838,13 +810,12 @@ export default function App() {
             {/* Studio Suite View */}
             {viewMode === 'studio' && activePhoto && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1">
-                {/* Left Preview */}
                 <div className="lg:col-span-2 bg-slate-900/80 border border-slate-800 rounded-2xl p-6 flex flex-col gap-4 shadow-2xl">
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="font-bold text-white text-base">{activePhoto.name}</h3>
-                      <p className="text-xs text-indigo-400 font-medium">
-                        Preset: {activePhoto.pipeline.color_grading.vibe_preset}
+                      <p className="text-xs text-amber-400 font-medium">
+                        Style: {activePhoto.pipeline.color_grading.vibe_preset}
                       </p>
                     </div>
 
@@ -884,11 +855,10 @@ export default function App() {
                       referrerPolicy="no-referrer"
                     />
                     <div className="absolute bottom-4 right-4 px-3 py-1 rounded-lg bg-black/70 backdrop-blur-md text-xs font-mono text-slate-300 border border-white/10">
-                      {compareBefore ? 'ORIGINAL' : 'PIPELINE GRADED + BADGE'}
+                      {compareBefore ? 'ORIGINAL' : 'RUMETH THAWASARA SIGNATURE'}
                     </div>
                   </div>
 
-                  {/* Schema Analysis Card */}
                   <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-4">
                     <div>
                       <span className="text-[11px] text-slate-500 block uppercase">Subject</span>
@@ -897,9 +867,9 @@ export default function App() {
                       </span>
                     </div>
                     <div>
-                      <span className="text-[11px] text-slate-500 block uppercase">Faces Detected</span>
-                      <span className="text-xs font-medium text-indigo-400">
-                        {activePhoto.analysis.has_faces ? 'Yes (Face Restoration Ready)' : 'None'}
+                      <span className="text-[11px] text-slate-500 block uppercase">Skin Tones</span>
+                      <span className="text-xs font-medium text-amber-400">
+                        {activePhoto.analysis.has_faces ? 'Protected & Soft' : 'Balanced'}
                       </span>
                     </div>
                     <div>
@@ -917,12 +887,11 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Right Schema Parameters Editor */}
                 <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 flex flex-col gap-6 shadow-2xl overflow-y-auto max-h-[850px]">
                   <div className="flex items-center justify-between pb-4 border-b border-slate-800">
                     <h3 className="font-bold text-white text-sm flex items-center gap-2">
-                      <Sliders className="w-4 h-4 text-indigo-400" />
-                      Editing Pipeline Parameters
+                      <Sliders className="w-4 h-4 text-amber-400" />
+                      Studio Grade Controls
                     </h3>
                     <button
                       onClick={() =>
@@ -931,13 +900,12 @@ export default function App() {
                           false
                         )
                       }
-                      className="text-xs text-indigo-400 hover:text-indigo-300 font-medium cursor-pointer"
+                      className="text-xs text-amber-400 hover:text-amber-300 font-medium cursor-pointer"
                     >
                       Reset to AI
                     </button>
                   </div>
 
-                  {/* Vibe Preset */}
                   <div>
                     <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
                       Vibe Preset
@@ -954,125 +922,39 @@ export default function App() {
                     />
                   </div>
 
-                  {/* White Balance */}
                   <div className="flex flex-col gap-3 pt-3 border-t border-slate-800">
-                    <h4 className="text-xs font-semibold text-indigo-300 uppercase tracking-wider">
-                      White Balance
+                    <h4 className="text-xs font-semibold text-amber-300 uppercase tracking-wider">
+                      White Balance & Exposure
                     </h4>
                     <div className="flex flex-col gap-1.5">
                       <div className="flex justify-between text-xs">
-                        <span className="text-slate-300">Temperature</span>
-                        <span className="font-mono text-indigo-400">
-                          {activePhoto.customPipeline.white_balance.temperature_adjustment}
+                        <span className="text-slate-300">Exposure</span>
+                        <span className="font-mono text-amber-400">
+                          {activePhoto.customPipeline.color_grading.exposure}
                         </span>
                       </div>
                       <input
                         type="range"
-                        min={-100}
-                        max={100}
-                        value={activePhoto.customPipeline.white_balance.temperature_adjustment}
+                        min={-50}
+                        max={50}
+                        value={activePhoto.customPipeline.color_grading.exposure}
                         onChange={(e) => {
                           const updated = { ...activePhoto.customPipeline };
-                          updated.white_balance.temperature_adjustment = Number(e.target.value);
+                          updated.color_grading.exposure = Number(e.target.value);
                           updateActivePhotoPipeline(updated);
                         }}
-                        className="w-full accent-indigo-500 bg-slate-950 h-1.5 rounded-lg cursor-pointer"
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-slate-300">Tint</span>
-                        <span className="font-mono text-indigo-400">
-                          {activePhoto.customPipeline.white_balance.tint_adjustment}
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min={-100}
-                        max={100}
-                        value={activePhoto.customPipeline.white_balance.tint_adjustment}
-                        onChange={(e) => {
-                          const updated = { ...activePhoto.customPipeline };
-                          updated.white_balance.tint_adjustment = Number(e.target.value);
-                          updateActivePhotoPipeline(updated);
-                        }}
-                        className="w-full accent-indigo-500 bg-slate-950 h-1.5 rounded-lg cursor-pointer"
+                        className="w-full accent-amber-500 bg-slate-950 h-1.5 rounded-lg cursor-pointer"
                       />
                     </div>
                   </div>
 
-                  {/* Color Grading */}
-                  <div className="flex flex-col gap-3 pt-3 border-t border-slate-800">
-                    <h4 className="text-xs font-semibold text-indigo-300 uppercase tracking-wider">
-                      Color Grading
-                    </h4>
-                    {(
-                      [
-                        { key: 'exposure', label: 'Exposure' },
-                        { key: 'contrast', label: 'Contrast' },
-                        { key: 'saturation', label: 'Saturation' },
-                        { key: 'vibrancy', label: 'Vibrancy' },
-                      ] as const
-                    ).map(({ key, label }) => (
-                      <div key={key} className="flex flex-col gap-1.5">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-slate-300">{label}</span>
-                          <span className="font-mono text-indigo-400">
-                            {activePhoto.customPipeline.color_grading[key]}
-                          </span>
-                        </div>
-                        <input
-                          type="range"
-                          min={-100}
-                          max={100}
-                          value={activePhoto.customPipeline.color_grading[key]}
-                          onChange={(e) => {
-                            const updated = { ...activePhoto.customPipeline };
-                            updated.color_grading[key] = Number(e.target.value);
-                            updateActivePhotoPipeline(updated);
-                          }}
-                          className="w-full accent-indigo-500 bg-slate-950 h-1.5 rounded-lg cursor-pointer"
-                        />
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Retouch & Enhancement */}
-                  <div className="flex flex-col gap-3 pt-3 border-t border-slate-800">
-                    <h4 className="text-xs font-semibold text-indigo-300 uppercase tracking-wider">
-                      Subject Enhancement
-                    </h4>
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-slate-300">Local Contrast</span>
-                        <span className="font-mono text-indigo-400">
-                          {activePhoto.customPipeline.retouch_and_enhancement.subject_enhancement.local_contrast}
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min={-100}
-                        max={100}
-                        value={activePhoto.customPipeline.retouch_and_enhancement.subject_enhancement.local_contrast}
-                        onChange={(e) => {
-                          const updated = { ...activePhoto.customPipeline };
-                          updated.retouch_and_enhancement.subject_enhancement.local_contrast = Number(e.target.value);
-                          updateActivePhotoPipeline(updated);
-                        }}
-                        className="w-full accent-indigo-500 bg-slate-950 h-1.5 rounded-lg cursor-pointer"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Branding Overlay */}
                   <div className="pt-3 border-t border-slate-800 flex flex-col gap-3">
                     <h4 className="font-bold text-white text-xs flex items-center gap-1.5 uppercase tracking-wider">
-                      <Tag className="w-3.5 h-3.5 text-indigo-400" />
-                      Branding Overlay
+                      <Tag className="w-3.5 h-3.5 text-amber-400" />
+                      Signature Watermark
                     </h4>
                     <div>
-                      <label className="text-[11px] text-slate-400 block mb-1">Global Footer Tag</label>
+                      <label className="text-[11px] text-slate-400 block mb-1">Watermark Text</label>
                       <input
                         type="text"
                         value={globalWatermarkText}
@@ -1089,7 +971,7 @@ export default function App() {
       </main>
 
       <footer className="py-6 border-t border-slate-900 text-center text-xs text-slate-500">
-        Lumina AI Studio &copy; 2026 · Schema-Driven Pipeline & HTML5 Canvas
+        Rumeth Thawasara Photo Studio &copy; 2026 · Professional Skin Tone & Foliage Color Grading
       </footer>
     </div>
   );

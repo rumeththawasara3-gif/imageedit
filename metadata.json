@@ -1,6 +1,6 @@
 {
-  "name": "Lumina AI Photo Studio",
-  "description": "AI-powered photo color grading, analysis, canvas processing, watermark tagging, and batch zip export.",
+  "name": "Rumeth Thawasara Photo Studio",
+  "description": "Professional AI photo color grading, analysis, canvas processing, and batch export by Rumeth Thawasara.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
