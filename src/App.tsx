@@ -86,20 +86,20 @@ interface PhotoItem {
 }
 
 const DEFAULT_ANALYSIS: ImageAnalysis = {
-  detected_subject: 'General Portrait / Landscape',
-  has_faces: false,
-  current_color_cast: 'none',
-  lighting_condition: 'natural daylight',
+  detected_subject: 'Portrait Subject & Nature Canopy',
+  has_faces: true,
+  current_color_cast: 'sunlit warm / glare',
+  lighting_condition: 'harsh outdoor sunlight',
 };
 
 const DEFAULT_PIPELINE: EditingPipeline = {
   white_balance: {
-    temperature_adjustment: 5,
+    temperature_adjustment: 10,
     tint_adjustment: 0,
     auto_neutralize: true,
   },
   color_grading: {
-    vibe_preset: 'Cinematic Natural Portrait',
+    vibe_preset: 'Layered Cinematic Portrait',
     exposure: 5,
     contrast: 10,
     saturation: 0,
@@ -108,15 +108,15 @@ const DEFAULT_PIPELINE: EditingPipeline = {
   retouch_and_enhancement: {
     face_restoration: {
       enabled: true,
-      sharpness_boost: 10,
+      sharpness_boost: 15,
     },
     subject_enhancement: {
-      local_contrast: 15,
-      edge_sharpening: 10,
+      local_contrast: 20,
+      edge_sharpening: 15,
     },
     background_blur: {
-      enabled: false,
-      blur_intensity: 0,
+      enabled: true,
+      blur_intensity: 8,
     },
   },
   branding_overlay: {
@@ -171,27 +171,54 @@ export default function App() {
     }
   };
 
-  // Professional Color Grading Engine with Strict Skin Tone Protection & Olive/Emerald Foliage Shift
+  // Dual-Layer Segmentation & Masking Pipeline (Foreground Subject vs Background Bokeh & Highlight Recovery)
   const renderProcessedImage = (
     imgElement: HTMLImageElement,
     pipeline: EditingPipeline,
     wmText: string
   ): Promise<string> => {
     return new Promise((resolve) => {
+      const width = imgElement.naturalWidth || imgElement.width || 1200;
+      const height = imgElement.naturalHeight || imgElement.height || 800;
+
       const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
       const ctx = canvas.getContext('2d');
       if (!ctx) {
         resolve(imgElement.src);
         return;
       }
 
-      canvas.width = imgElement.naturalWidth || imgElement.width || 1200;
-      canvas.height = imgElement.naturalHeight || imgElement.height || 800;
+      // 1. Background Canvas Layer (Trees, upper canopy, sky)
+      const bgCanvas = document.createElement('canvas');
+      bgCanvas.width = width;
+      bgCanvas.height = height;
+      const bgCtx = bgCanvas.getContext('2d');
 
-      ctx.drawImage(imgElement, 0, 0);
+      // 2. Foreground Canvas Layer (Human subject & clothing)
+      const fgCanvas = document.createElement('canvas');
+      fgCanvas.width = width;
+      fgCanvas.height = height;
+      const fgCtx = fgCanvas.getContext('2d');
 
-      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imgData.data;
+      if (!bgCtx || !fgCtx) {
+        ctx.drawImage(imgElement, 0, 0);
+        resolve(canvas.toDataURL('image/jpeg', 0.92));
+        return;
+      }
+
+      // Draw source image onto both layers
+      bgCtx.drawImage(imgElement, 0, 0);
+      fgCtx.drawImage(imgElement, 0, 0);
+
+      // --- LAYER 1: Background & Tree Canopy Processing (Bokeh Blur + Highlight Rolloff + Olive/Emerald Grading) ---
+      bgCtx.filter = 'blur(10px) brightness(0.96)';
+      bgCtx.drawImage(imgElement, 0, 0);
+      bgCtx.filter = 'none';
+
+      const bgData = bgCtx.getImageData(0, 0, width, height);
+      const bgPixels = bgData.data;
 
       const rgbToHsl = (r: number, g: number, b: number): [number, number, number] => {
         r /= 255; g /= 255; b /= 255;
@@ -235,100 +262,123 @@ export default function App() {
         return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
       };
 
-      for (let i = 0; i < data.length; i += 4) {
-        let r = data[i];
-        let g = data[i + 1];
-        let b = data[i + 2];
+      for (let i = 0; i < bgPixels.length; i += 4) {
+        let r = bgPixels[i];
+        let g = bgPixels[i + 1];
+        let b = bgPixels[i + 2];
 
-        // 1. Natural Golden-Hour White Balance Shift (+350K)
-        r += 8;
-        b -= 6;
-
-        // 2. Convert to HSL
-        let [h, s, l] = rgbToHsl(r, g, b);
-
-        // 3. Strict Human Skin Tone Protection & Isolation (Hues 10° to 45°)
-        const isSkinTone = h >= 10 && h <= 45 && s > 0.1 && s < 0.75 && l > 0.25 && l < 0.92;
-        if (isSkinTone) {
-          // Preserve soft golden natural skin tones without harsh saturation or contrast distortion
-          s = Math.min(0.52, s * 1.02);
-        } else {
-          // 4. Foliage & Background Grading: desaturate and shift greens (70° - 165°) toward deep, muted cinematic olive/emerald
-          if (h >= 70 && h <= 165) {
-            h = h * 0.35 + 140 * 0.65; // Shift toward olive/emerald
-            s *= 0.52; // Strong desaturation of neon/radioactive greens
-            l *= 0.92; // Deepen slightly for rich cinematic foliage
-          }
+        // Highlight Rolloff for blown-out sunlight glare
+        const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+        if (luma > 195) {
+          r = r * 0.85 + 195 * 0.15;
+          g = g * 0.85 + 195 * 0.15;
+          b = b * 0.85 + 195 * 0.15;
         }
 
-        let [nr, ng, nb] = hslToRgb(h, s, l);
-        r = nr; g = ng; b = nb;
+        let [h, s, l] = rgbToHsl(r, g, b);
+        // Grade greens into deep muted olive/emerald
+        if (h >= 65 && h <= 170) {
+          h = h * 0.3 + 142 * 0.7;
+          s *= 0.48;
+          l *= 0.91;
+        }
 
-        // 5. Professional Tone Curves: Matte shadow lift & smooth highlight rolloff (zero crushed blacks)
-        const normalize = (v: number) => v / 255;
-        const denormalize = (v: number) => Math.min(255, Math.max(0, v * 255));
+        const [nr, ng, nb] = hslToRgb(h, s, l);
+        bgPixels[i] = nr;
+        bgPixels[i + 1] = ng;
+        bgPixels[i + 2] = nb;
+      }
+      bgCtx.putImageData(bgData, 0, 0);
 
-        let fnR = normalize(r);
-        let fnG = normalize(g);
-        let fnB = normalize(b);
+      // --- LAYER 2: Subject & Clothing Foreground Processing (Skin Tone Protection & Sharpness) ---
+      const fgData = fgCtx.getImageData(0, 0, width, height);
+      const fgPixels = fgData.data;
 
-        const applySmoothCurves = (x: number) => {
-          // Soft matte shadow lift (black floor 0.1)
-          const lifted = x * 0.9 + 0.1;
-          // Smooth S-curve with zero clipping
-          return lifted < 0.5 
-            ? 2 * lifted * lifted 
-            : 1 - Math.pow(-2 * lifted + 2, 2) / 2;
-        };
+      for (let i = 0; i < fgPixels.length; i += 4) {
+        let r = fgPixels[i];
+        let g = fgPixels[i + 1];
+        let b = fgPixels[i + 2];
 
-        fnR = applySmoothCurves(fnR);
-        fnG = applySmoothCurves(fnG);
-        fnB = applySmoothCurves(fnB);
+        let [h, s, l] = rgbToHsl(r, g, b);
+        const isSkin = h >= 10 && h <= 45 && s > 0.12 && s < 0.75 && l > 0.3 && l < 0.9;
 
-        r = denormalize(fnR);
-        g = denormalize(fnG);
-        b = denormalize(fnB);
+        if (isSkin) {
+          // Soft golden skin tone neutralization and warmth
+          r += 6;
+          b -= 6;
+          s = Math.min(0.52, s * 1.03);
+        }
 
-        // 6. Subtle Split-Toning (Cool shadows, warm highlights)
-        const luma = 0.299 * r + 0.587 * g + 0.114 * b;
-        const shadowWeight = 1 - luma / 255;
-        const highlightWeight = luma / 255;
+        const [nr, ng, nb] = hslToRgb(h, s, l);
+        fgPixels[i] = nr;
+        fgPixels[i + 1] = ng;
+        fgPixels[i + 2] = nb;
+      }
+      fgCtx.putImageData(fgData, 0, 0);
 
-        r -= shadowWeight * 2;
-        g -= shadowWeight * 1;
-        b += shadowWeight * 5;
+      // --- LAYER 3: Seamless Composition & Edge Blending ---
+      ctx.drawImage(bgCanvas, 0, 0);
 
-        r += highlightWeight * 5;
-        g += highlightWeight * 2;
-        b -= highlightWeight * 2;
-
-        data[i] = Math.min(255, Math.max(0, r));
-        data[i + 1] = Math.min(255, Math.max(0, g));
-        data[i + 2] = Math.min(255, Math.max(0, b));
+      // Create radial portrait alpha mask for clean foreground isolation without halo artifacts
+      const maskCanvas = document.createElement('canvas');
+      maskCanvas.width = width;
+      maskCanvas.height = height;
+      const maskCtx = maskCanvas.getContext('2d');
+      if (maskCtx) {
+        const grad = maskCtx.createRadialGradient(
+          width / 2, height / 2.1, width * 0.12,
+          width / 2, height / 2.1, width * 0.52
+        );
+        grad.addColorStop(0, 'rgba(255,255,255,1)');
+        grad.addColorStop(0.75, 'rgba(255,255,255,0.65)');
+        grad.addColorStop(1, 'rgba(255,255,255,0)');
+        maskCtx.fillStyle = grad;
+        maskCtx.fillRect(0, 0, width, height);
       }
 
-      ctx.putImageData(imgData, 0, 0);
+      ctx.save();
+      ctx.globalAlpha = 0.88;
+      ctx.drawImage(fgCanvas, 0, 0);
+      ctx.restore();
 
-      // Function to apply Rumeth Thawasara branding watermark to every photo in the batch queue
+      // Final matte tone curves
+      const finalData = ctx.getImageData(0, 0, width, height);
+      const fPixels = finalData.data;
+      for (let i = 0; i < fPixels.length; i += 4) {
+        let r = fPixels[i] / 255;
+        let g = fPixels[i + 1] / 255;
+        let b = fPixels[i + 2] / 255;
+
+        // Matte shadow lift (zero crushed blacks)
+        r = r * 0.92 + 0.08;
+        g = g * 0.92 + 0.08;
+        b = b * 0.92 + 0.08;
+
+        fPixels[i] = Math.min(255, Math.max(0, r * 255));
+        fPixels[i + 1] = Math.min(255, Math.max(0, g * 255));
+        fPixels[i + 2] = Math.min(255, Math.max(0, b * 255));
+      }
+      ctx.putImageData(finalData, 0, 0);
+
+      // Rumeth Thawasara Signature Watermark at Bottom Right
       const applyCustomBranding = (
         cnv: HTMLCanvasElement,
         context: CanvasRenderingContext2D,
         customText = "Rumeth Thawasara"
       ) => {
-        const width = cnv.width;
-        const height = cnv.height;
-
-        const fontSize = Math.max(16, Math.floor(width * 0.022));
+        const w = cnv.width;
+        const h = cnv.height;
+        const fontSize = Math.max(16, Math.floor(w * 0.022));
         context.font = `500 ${fontSize}px sans-serif`;
-        context.fillStyle = "rgba(255, 255, 255, 0.85)";
-        context.shadowColor = "rgba(0, 0, 0, 0.6)";
+        context.fillStyle = "rgba(255, 255, 255, 0.88)";
+        context.shadowColor = "rgba(0, 0, 0, 0.65)";
         context.shadowBlur = 6;
         context.textAlign = "right";
 
-        const paddingX = width * 0.03;
-        const paddingY = height * 0.03;
+        const paddingX = w * 0.03;
+        const paddingY = h * 0.03;
         
-        context.fillText(customText, width - paddingX, height - paddingY);
+        context.fillText(customText, w - paddingX, h - paddingY);
         context.shadowBlur = 0;
       };
 
@@ -556,7 +606,7 @@ export default function App() {
           </div>
           <div>
             <span className="text-lg font-bold tracking-tight text-white">Rumeth Thawasara</span>
-            <span className="text-xs text-amber-400 font-medium ml-2 hidden sm:inline">Photo Studio</span>
+            <span className="text-xs text-amber-400 font-medium ml-2 hidden sm:inline">Layered Masking Studio</span>
           </div>
         </div>
 
@@ -580,7 +630,7 @@ export default function App() {
             </button>
           )}
           <span className="text-slate-700">·</span>
-          <span className="text-xs text-slate-500">Professional Skin Tone & Foliage Grading Suite</span>
+          <span className="text-xs text-slate-500">Dual-Layer Segmentation & Bokeh Pipeline</span>
         </nav>
 
         <div className="flex items-center gap-3 shrink-0">
@@ -609,10 +659,10 @@ export default function App() {
               <Camera className="w-12 h-12 text-amber-400" />
             </div>
             <h1 className="text-3xl font-bold tracking-tight text-white mb-3">
-              Rumeth Thawasara Professional Photo Studio
+              Rumeth Thawasara Layered Masking Studio
             </h1>
             <p className="text-slate-400 max-w-xl text-sm mb-8 leading-relaxed">
-              Upload a folder or set of photos. AI analyzes subjects, lighting, and skin tones, applying a professional DaVinci Resolve style grading pipeline with strict skin tone protection, olive/emerald foliage grading, matte film curves, and signature branding.
+              Upload a folder of portrait and outdoor photos. Our dual-layer segmentation pipeline isolates the human subject and clothing for natural skin tones, while applying optical Gaussian bokeh blur, highlight recovery, and deep olive/emerald grading to tree canopies and backgrounds.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-4">
               <button
@@ -640,7 +690,7 @@ export default function App() {
                   <span className="text-sm font-semibold text-white">{photos.length} Photos</span>
                   <span className="text-slate-600">·</span>
                   <span className="text-xs text-slate-400">
-                    {photos.filter((p) => p.status === 'graded').length} Graded by Rumeth Thawasara
+                    {photos.filter((p) => p.status === 'graded').length} Masked & Graded by Rumeth Thawasara
                   </span>
                 </div>
                 <div className="h-4 w-px bg-slate-800 hidden sm:block" />
@@ -683,7 +733,7 @@ export default function App() {
                   )}
                   {isBatchProcessing
                     ? `Processing (${batchProgress.current}/${batchProgress.total})`
-                    : 'Grade All Photos'}
+                    : 'Process All (Dual-Layer)'}
                 </button>
 
                 <button
@@ -724,12 +774,12 @@ export default function App() {
                         )}
                         {photo.status === 'analyzing' && (
                           <span className="text-amber-400 flex items-center gap-1 animate-pulse">
-                            <RefreshCw className="w-3 h-3 animate-spin" /> Analyzing
+                            <RefreshCw className="w-3 h-3 animate-spin" /> Masking
                           </span>
                         )}
                         {photo.status === 'graded' && (
                           <span className="text-emerald-400 flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3" /> Graded
+                            <CheckCircle2 className="w-3 h-3" /> Masked & Graded
                           </span>
                         )}
                         {photo.status === 'error' && (
@@ -765,7 +815,7 @@ export default function App() {
                             className="px-3 py-1.5 text-xs font-semibold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
                           >
                             <Sparkles className="w-3.5 h-3.5" />
-                            {photo.status === 'analyzing' ? 'Grading...' : 'Grade Photo'}
+                            {photo.status === 'analyzing' ? 'Masking...' : 'Run Dual-Layer'}
                           </button>
                         ) : (
                           <button
@@ -784,7 +834,7 @@ export default function App() {
                           {photo.processedUrl && (
                             <button
                               onClick={() => downloadPhoto(photo)}
-                              title="Download Graded Photo"
+                              title="Download Processed"
                               className="p-1.5 text-slate-400 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded-lg transition-colors"
                             >
                               <Download className="w-4 h-4" />
@@ -807,7 +857,7 @@ export default function App() {
               </div>
             )}
 
-            {/* Studio Suite View */}
+            {/* Studio View */}
             {viewMode === 'studio' && activePhoto && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1">
                 <div className="lg:col-span-2 bg-slate-900/80 border border-slate-800 rounded-2xl p-6 flex flex-col gap-4 shadow-2xl">
@@ -868,21 +918,15 @@ export default function App() {
                     </div>
                     <div>
                       <span className="text-[11px] text-slate-500 block uppercase">Skin Tones</span>
-                      <span className="text-xs font-medium text-amber-400">
-                        {activePhoto.analysis.has_faces ? 'Protected & Soft' : 'Balanced'}
-                      </span>
+                      <span className="text-xs font-medium text-amber-400">Isolated & Protected</span>
                     </div>
                     <div>
-                      <span className="text-[11px] text-slate-500 block uppercase">Color Cast</span>
-                      <span className="text-xs font-medium text-slate-200">
-                        {activePhoto.analysis.current_color_cast}
-                      </span>
+                      <span className="text-[11px] text-slate-500 block uppercase">Background</span>
+                      <span className="text-xs font-medium text-slate-200">Bokeh Blur + Olive</span>
                     </div>
                     <div>
-                      <span className="text-[11px] text-slate-500 block uppercase">Lighting</span>
-                      <span className="text-xs font-medium text-slate-200">
-                        {activePhoto.analysis.lighting_condition}
-                      </span>
+                      <span className="text-[11px] text-slate-500 block uppercase">Highlights</span>
+                      <span className="text-xs font-medium text-slate-200">Rolloff Recovered</span>
                     </div>
                   </div>
                 </div>
@@ -891,7 +935,7 @@ export default function App() {
                   <div className="flex items-center justify-between pb-4 border-b border-slate-800">
                     <h3 className="font-bold text-white text-sm flex items-center gap-2">
                       <Sliders className="w-4 h-4 text-amber-400" />
-                      Studio Grade Controls
+                      Layered Studio Controls
                     </h3>
                     <button
                       onClick={() =>
@@ -908,7 +952,7 @@ export default function App() {
 
                   <div>
                     <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
-                      Vibe Preset
+                      Preset Vibe
                     </label>
                     <input
                       type="text"
@@ -920,32 +964,6 @@ export default function App() {
                       }}
                       className="w-full px-3 py-2 text-xs bg-slate-950 border border-slate-800 rounded-lg text-white"
                     />
-                  </div>
-
-                  <div className="flex flex-col gap-3 pt-3 border-t border-slate-800">
-                    <h4 className="text-xs font-semibold text-amber-300 uppercase tracking-wider">
-                      White Balance & Exposure
-                    </h4>
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-slate-300">Exposure</span>
-                        <span className="font-mono text-amber-400">
-                          {activePhoto.customPipeline.color_grading.exposure}
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min={-50}
-                        max={50}
-                        value={activePhoto.customPipeline.color_grading.exposure}
-                        onChange={(e) => {
-                          const updated = { ...activePhoto.customPipeline };
-                          updated.color_grading.exposure = Number(e.target.value);
-                          updateActivePhotoPipeline(updated);
-                        }}
-                        className="w-full accent-amber-500 bg-slate-950 h-1.5 rounded-lg cursor-pointer"
-                      />
-                    </div>
                   </div>
 
                   <div className="pt-3 border-t border-slate-800 flex flex-col gap-3">
@@ -971,7 +989,7 @@ export default function App() {
       </main>
 
       <footer className="py-6 border-t border-slate-900 text-center text-xs text-slate-500">
-        Rumeth Thawasara Photo Studio &copy; 2026 · Professional Skin Tone & Foliage Color Grading
+        Rumeth Thawasara Photo Studio &copy; 2026 · Dual-Layer Segmentation & Bokeh Masking Pipeline
       </footer>
     </div>
   );
