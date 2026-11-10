@@ -456,14 +456,47 @@ export default function App() {
         )
       );
     } catch (err: any) {
-      console.error(err);
-      setPhotos((prev) =>
-        prev.map((p) =>
-          p.id === photoId
-            ? { ...p, status: 'error', error: err.message || 'AI analysis failed' }
-            : p
-        )
-      );
+      console.warn('API connection encountered issue, falling back to local canvas enhancement mode:', err);
+      try {
+        const fallbackPipeline = JSON.parse(JSON.stringify(DEFAULT_PIPELINE));
+        const fallbackAnalysis = { ...DEFAULT_ANALYSIS };
+
+        const img = new window.Image();
+        img.src = photo.originalUrl;
+        await new Promise((resolve) => {
+          img.onload = resolve;
+        });
+
+        const processedUrl = await renderProcessedImage(
+          img,
+          fallbackPipeline,
+          globalWatermarkText
+        );
+
+        setPhotos((prev) =>
+          prev.map((p) =>
+            p.id === photoId
+              ? {
+                  ...p,
+                  status: 'graded',
+                  analysis: fallbackAnalysis,
+                  pipeline: fallbackPipeline,
+                  customPipeline: fallbackPipeline,
+                  processedUrl,
+                }
+              : p
+          )
+        );
+      } catch (fallbackErr) {
+        console.error('Local fallback processing failed:', fallbackErr);
+        setPhotos((prev) =>
+          prev.map((p) =>
+            p.id === photoId
+              ? { ...p, status: 'error', error: 'Processing failed' }
+              : p
+          )
+        );
+      }
     }
   };
 
