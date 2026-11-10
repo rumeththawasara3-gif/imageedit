@@ -1,0 +1,6 @@
+{
+  "name": "Lumina AI Photo Studio",
+  "description": "AI-powered photo color grading, analysis, canvas processing, watermark tagging, and batch zip export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
