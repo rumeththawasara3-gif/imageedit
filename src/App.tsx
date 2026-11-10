@@ -174,7 +174,7 @@ export default function App() {
     }
   };
 
-  // Canvas processing pipeline based on the exact user schema parameters
+  // Professional High-End Portrait Suite & HSL Channel Color Grading Engine
   const renderProcessedImage = (
     imgElement: HTMLImageElement,
     pipeline: EditingPipeline,
@@ -196,63 +196,131 @@ export default function App() {
       const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imgData.data;
 
-      const { white_balance, color_grading, retouch_and_enhancement } = pipeline;
+      const rgbToHsl = (r: number, g: number, b: number): [number, number, number] => {
+        r /= 255; g /= 255; b /= 255;
+        const max = Math.max(r, g, b), min = Math.min(r, g, b);
+        let h = 0, s, l = (max + min) / 2;
+        if (max === min) {
+          h = s = 0;
+        } else {
+          const d = max - min;
+          s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+          switch (max) {
+            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+            case g: h = (b - r) / d + 2; break;
+            case b: h = (r - g) / d + 4; break;
+          }
+          h /= 6;
+        }
+        return [h * 360, s, l];
+      };
 
-      const expFactor = 1 + color_grading.exposure / 100;
-      const contrastFactor = Math.pow((color_grading.contrast + 100) / 100, 2);
-      const satFactor = (color_grading.saturation + 100) / 100;
-      const vibrancyFactor = (color_grading.vibrancy + 100) / 100;
-
-      const tempVal = white_balance.temperature_adjustment / 100;
-      const tintVal = white_balance.tint_adjustment / 100;
-      const localContrast = retouch_and_enhancement.subject_enhancement.local_contrast / 100;
+      const hslToRgb = (h: number, s: number, l: number): [number, number, number] => {
+        h = ((h % 360) + 360) % 360 / 360;
+        let r, g, b;
+        if (s === 0) {
+          r = g = b = l;
+        } else {
+          const hue2rgb = (p: number, q: number, t: number) => {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1/6) return p + (q - p) * 6 * t;
+            if (t < 1/2) return q;
+            if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+            return p;
+          };
+          const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+          const p = 2 * l - q;
+          r = hue2rgb(p, q, h + 1/3);
+          g = hue2rgb(p, q, h);
+          b = hue2rgb(p, q, h - 1/3);
+        }
+        return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+      };
 
       for (let i = 0; i < data.length; i += 4) {
         let r = data[i];
         let g = data[i + 1];
         let b = data[i + 2];
 
-        // Exposure
-        r *= expFactor;
-        g *= expFactor;
-        b *= expFactor;
+        // 1. Golden Hour White Balance (+350K shift)
+        r += 10;
+        b -= 8;
 
-        // Contrast
-        r = ((r / 255 - 0.5) * contrastFactor + 0.5) * 255;
-        g = ((g / 255 - 0.5) * contrastFactor + 0.5) * 255;
-        b = ((b / 255 - 0.5) * contrastFactor + 0.5) * 255;
+        // 2. Convert to HSL
+        let [h, s, l] = rgbToHsl(r, g, b);
 
-        // White Balance (Temperature & Tint)
-        if (tempVal > 0) {
-          r += tempVal * 35;
-          b -= tempVal * 35;
-        } else {
-          b += Math.abs(tempVal) * 35;
-          r -= Math.abs(tempVal) * 35;
+        // 3. Selective HSL Channel Adjustments matching Blueprint
+        // Reds: hue 0, sat -5%, lum +2%
+        if (h <= 10 || h >= 350) {
+          s *= 0.95;
+          l = Math.min(1, l * 1.02);
         }
-        if (tintVal > 0) {
-          g -= tintVal * 20;
-          r += tintVal * 20;
-        } else {
-          g += Math.abs(tintVal) * 20;
+        // Yellows: hue -12°, sat -20%, lum +10%
+        else if (h > 10 && h <= 45) {
+          h = (h - 12 + 360) % 360;
+          s *= 0.80;
+          l = Math.min(1, l * 1.10);
         }
-
-        // Saturation & Vibrancy
-        if (satFactor !== 1 || vibrancyFactor !== 1) {
-          const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-          const totalSat = satFactor * vibrancyFactor;
-          r = gray + totalSat * (r - gray);
-          g = gray + totalSat * (g - gray);
-          b = gray + totalSat * (b - gray);
+        // Greens (Foliage & background): hue -18°, sat -35%, lum -5% -> Olive/Emerald cinematic shift
+        else if (h > 45 && h <= 170) {
+          h = (h - 18 + 360) % 360;
+          s *= 0.65;
+          l *= 0.95;
+        }
+        // Blues: hue +5°, sat -10%, lum 0%
+        else if (h > 180 && h < 260) {
+          h = (h + 5) % 360;
+          s *= 0.90;
         }
 
-        // Local Contrast / Clarity adjustment
-        if (localContrast !== 0) {
-          const diff = (r - 128) * localContrast * 0.2;
-          r += diff;
-          g += diff;
-          b += diff;
+        // 4. Skin Tone Protection (Isolate warm skin tones 15° - 38°)
+        const isSkinTone = h >= 15 && h <= 38 && s > 0.15 && l > 0.25 && l < 0.9;
+        if (isSkinTone) {
+          s = Math.min(0.6, s * 1.08); // preserve soft golden skin tones
         }
+
+        // Convert back to RGB
+        let [nr, ng, nb] = hslToRgb(h, s, l);
+        r = nr; g = ng; b = nb;
+
+        // 5. Tone Curves: Matte shadow lift & highlight rolloff (zero crushed blacks)
+        const normalize = (v: number) => v / 255;
+        const denormalize = (v: number) => Math.min(255, Math.max(0, v * 255));
+
+        let fnR = normalize(r);
+        let fnG = normalize(g);
+        let fnB = normalize(b);
+
+        const applyToneCurves = (x: number) => {
+          // Matte shadow lift (black floor to 0.12)
+          const lifted = x * 0.86 + 0.14;
+          // Filmic S-curve with soft highlight rolloff
+          return lifted < 0.5 
+            ? 2 * lifted * lifted 
+            : 1 - Math.pow(-2 * lifted + 2, 2) / 2;
+        };
+
+        fnR = applyToneCurves(fnR);
+        fnG = applyToneCurves(fnG);
+        fnB = applyToneCurves(fnB);
+
+        r = denormalize(fnR);
+        g = denormalize(fnG);
+        b = denormalize(fnB);
+
+        // 6. Split-Toning (Cool shadows, warm highlights)
+        const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+        const shadowWeight = 1 - luma / 255;
+        const highlightWeight = luma / 255;
+
+        r -= shadowWeight * 3;
+        g -= shadowWeight * 1;
+        b += shadowWeight * 7;
+
+        r += highlightWeight * 7;
+        g += highlightWeight * 3;
+        b -= highlightWeight * 3;
 
         data[i] = Math.min(255, Math.max(0, r));
         data[i + 1] = Math.min(255, Math.max(0, g));
